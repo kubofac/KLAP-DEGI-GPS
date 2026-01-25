@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KLAP_DEGI_INTERNAL_GPS</title>
+    <style>
+        /* 既存のCSSをそのまま使用 */
+        :root { --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; --hrc-orange: #FFA500; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--hrc-white); font-family: 'Arial Black', sans-serif; overflow: hidden; }
+        #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
+        #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
+        .main-ui-container { position: absolute; right: 10px; top: 120px; bottom: 70px; display: flex; align-items: flex-start; gap: 45px; z-index: 20; pointer-events: auto; }
+        #info-overlay { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 10px; }
+        #rpm_val { font-size: 13vh; font-weight: 900; line-height: 0.8; margin-top: 10px; text-shadow: 3px 3px 12px #000; }
+        #display1 { font-size: 18vh; font-weight: 900; line-height: 0.9; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
+        #display { font-size: 4vh; color: #bbb; text-shadow: 1px 1px 6px #000; }
+        .right-panels { display: flex; flex-direction: row; gap: 15px; height: 100%; align-items: flex-start; }
+        #lap-panel { width: 175px; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #333; }
+        #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
+        .lap-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 18px; font-weight: 900; }
+        .best-lap { color: var(--hrc-red); }
+        .data-panel { display: flex; flex-direction: column; gap: 15px; width: 110px; }
+        .data-box { display: flex; flex-direction: column; align-items: flex-end; }
+        .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
+        .val { font-size: 40px; font-weight: 900; line-height: 0.9; }
+        footer { height: 55px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: fixed; bottom: 0; left: 0; right: 0; }
+        button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
+        button.waiting { background: var(--hrc-orange) !important; color: #000 !important; }
+        button.active { background: var(--hrc-red) !important; color: #fff !important; }
+        button.demo-active { animation: demoBlink 1s infinite; background: var(--hrc-red) !important; }
+        @keyframes demoBlink { 0% {opacity: 1;} 50% {opacity: 0.6;} 100% {opacity: 1;} }
+    </style>
+</head>
+<body>
+
+<div id="dashboard">
+    <canvas id="canvas"></canvas>
+    <div class="main-ui-container">
+        <div id="info-overlay">
+            <div id="rpm_val">0</div>
+            <div id="display1">00:00.000</div>
+            <div id="display">TOTAL 00:00.000</div>
+        </div>
+        <div class="right-panels">
+            <div id="lap-panel"><div id="lap"></div></div>
+            <div class="data-panel">
+                <div class="data-box"><div class="label">SPEED</div><div class="val" id="speed_val">0</div></div>
+                <div class="data-box"><div class="label">TEMP</div><div class="val" id="temp_val">--</div></div>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <button id="intGpsBtn">INT GPS</button>
+        <button id="btConnect">BLE START</button>
+        <button id="startBtn">TIMER</button>
+        <button id="lapBtn">LAP/RESET</button>
+        <button id="reloadBtn">RELOAD</button>
+    </footer>
+</div>
+
+<script>
+'use strict';
+
+// --- 定数・変数 ---
+const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
+let currentRPM = 0, lastPos = null, lastLapTime = 0;
+let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
+let gpsThresholdValue = 20, lapCoolDown = 15000, pulseCount = 1;
+let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
+let lastGpsDataTime = 0, lastBleDataTime = 0;
+let gpsWaiting = false, bleWaiting = false;
+let isFrozen = false, freezeDisplayTime = "", freezeStartTime = 0;
+let previousSideOfLine = null, isGpsFixed = false;
+let watchId = null;
+
+// デモモード
+let isDemoMode = false, demoClickCount = 0, demoInterval = null;
+const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+
+// --- ヘルパー関数 ---
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const f1 = lat1 * Math.PI / 180, f2 = lat2 * Math.PI / 180;
+    const df = (lat2 - lat1) * Math.PI / 180, dl = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(df/2)**2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function calculatePerpendicularFootApprox(l1, l2, p) {
+    const dx = l2.lon - l1.lon, dy = l2.lat - l1.lat;
+    const lenSq = dx*dx + dy*dy;
+    if (lenSq < 1e-9) return l1;
+    const t = ((p.lon - l1.lon) * dx + (p.lat - l1.lat) * dy) / lenSq;
+    const ct = Math.max(0, Math.min(1, t));
+    return { lat: l1.lat + ct * dy, lon: l1.lon + ct * dx };
+}
+function getSideOfLine(pLat, pLon, l1Lat, l1Lon, l2Lat, l2Lon) {
+    return (l2Lon - l1Lon) * (pLat - l1Lat) - (l2Lat - l1Lat) * (pLon - l1Lon);
+}
+function getIntersectionTime(p1, p2) {
+    const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon);
+    if (Math.abs(den) < 1e-12) return null;
+    const t_num = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (LAP_LINE_P1.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (LAP_LINE_P1.lon - p1.lon);
+    const t_ratio = t_num / den;
+    return (t_ratio >= 0 && t_ratio <= 1) ? p1.time + (p2.time - p1.time) * t_ratio : null;
+}
+
+// --- GPSロジック（内蔵GPS版） ---
+function startInternalGps() {
+    if (!("geolocation" in navigator)) {
+        alert("Geolocation非対応です");
+        return;
+    }
+
+    gpsWaiting = true;
+    const options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 };
+
+    // 既存の監視があれば止める
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+
+    watchId = navigator.geolocation.watchPosition(pos => {
+        lastGpsDataTime = Date.now();
+        isGpsFixed = true; // 位置が取れていればFixedとみなす
+        gpsWaiting = false;
+
+        // 速度取得 (m/s -> km/h)
+        const speedKmh = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+        document.getElementById('speed_val').textContent = speedKmh;
+
+        const currentPos = { lat: pos.coords.latitude, lon: pos.coords.longitude, time: Date.now() };
+
+        // スタートライン判定ロジック (既存のものを継承)
+        if (swState === 1 && LAP_LINE_P1.lat !== 0) {
+            const currentSide = getSideOfLine(currentPos.lat, currentPos.lon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
+            if (lastPos && previousSideOfLine !== null) {
+                // ラインの前後が入れ替わった判定
+                if (((previousSideOfLine > 0 && currentSide < 0) || (previousSideOfLine < 0 && currentSide > 0)) && (currentPos.time - lastLapTime >= lapCoolDown)) {
+                    const foot = calculatePerpendicularFootApprox(LAP_LINE_P1, LAP_LINE_P2, currentPos);
+                    // 閾値内(m)であれば通過とみなす
+                    if (calculateDistance(currentPos.lat, currentPos.lon, foot.lat, foot.lon) <= gpsThresholdValue) {
+                        const exactTime = getIntersectionTime(lastPos, currentPos);
+                        if (exactTime) processLap(exactTime, true);
+                    }
+                }
+            }
+            previousSideOfLine = currentSide;
+        }
+        lastPos = currentPos;
+
+    }, err => {
+        console.error("GPS Error:", err);
+        isGpsFixed = false;
+    }, options);
+}
+
+// --- 以下、既存のBLE・計測・描画ロジックを維持 ---
+
+async function ble() {
+    try {
+        const bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
+        bleWaiting = true;
+        const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID);
+        const pC = await service.getCharacteristic(PULSE_UUID), tC = await service.getCharacteristic(TEMP_UUID);
+        await pC.startNotifications();
+        pC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount; };
+        await tC.startNotifications();
+        tC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); document.getElementById('temp_val').textContent = e.target.value.getUint8(0); };
+    } catch (e) { console.error(e); bleWaiting = false; }
+}
+
+function processLap(exactTime, useFreeze) {
+    const lapTime = exactTime - (lapStartTime || startTime); 
+    lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
+    const d = document.getElementById('lap'); d.innerHTML = "";
+    const best = Math.min(...lapRecords);
+    lapRecords.forEach((t, i) => {
+        const r = document.createElement('div'); r.className = `lap-row ${t === best ? 'best-lap' : ''}`;
+        r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; d.appendChild(r);
+    });
+    if (useFreeze) { isFrozen = true; freezeDisplayTime = timeFormat(lapTime); freezeStartTime = Date.now(); }
+}
+
+function timeFormat(ms) { 
+    let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), mss = Math.floor(ms%1000); 
+    return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${mss.toString().padStart(3,'0')}`; 
+}
+
+function tick() { 
+    if (swState !== 1) return; 
+    const now = Date.now();
+    document.getElementById('display').textContent = "TOTAL " + timeFormat(now - startTime); 
+    const lapDisp = document.getElementById('display1');
+    if (isFrozen) {
+        lapDisp.textContent = freezeDisplayTime;
+        if (now - freezeStartTime > 15000) isFrozen = false;
+    } else { lapDisp.textContent = timeFormat(now - lapStartTime); }
+    requestAnimationFrame(tick); 
+}
+
+// 接続状況監視（ボタンの色管理）
+setInterval(() => {
+    const now = Date.now(), gBtn = document.getElementById('intGpsBtn'), bBtn = document.getElementById('btConnect');
+    // GPS
+    if (now - lastGpsDataTime < 2500 && lastGpsDataTime !== 0 && isGpsFixed) gBtn.className = 'active';
+    else if (gpsWaiting) gBtn.className = 'waiting';
+    else gBtn.className = '';
+    // BLE
+    if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) bBtn.className = 'active';
+    else if (bleWaiting) bBtn.className = 'waiting'; else bBtn.className = '';
+}, 1000);
+
+function drawTacho(rpm) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const w = canvas.width, h = canvas.height, segments = 75, active = Math.floor((rpm / 14000) * segments);
+    const sX = 20, hY = 80, bY = h - 20, rad = bY - hY, curveEnd = 30;
+    for (let i = 0; i <= segments; i++) {
+        let x, y, ang, prog;
+        if (i <= curveEnd) { prog = i / curveEnd; ang = Math.PI + (prog * (Math.PI / 2)); x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad; }
+        else { prog = (i - curveEnd) / (segments - curveEnd); x = (sX + rad) + (prog * (w - 15 - (sX + rad))); y = hY; ang = 1.5 * Math.PI; }
+        if (i % 10 === 0 || i === segments) {
+            ctx.save(); ctx.fillStyle = i < active ? "#fff" : "#444"; ctx.font = "italic bold 22px Arial"; ctx.textAlign = "center";
+            ctx.fillText(Math.round((i / segments) * 14), x + Math.cos(ang) * 45, y + Math.sin(ang) * 45); ctx.restore();
+        }
+        if (i < segments) {
+            ctx.fillStyle = i < active ? (((i/segments)*14000) >= 12500 ? "#E4002B" : (((i/segments)*14000) >= 8000 ? "#004098" : "#FFFFFF")) : "#222";
+            ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.fillRect(-5, -23, 10, 46); ctx.restore();
+        }
+    }
+    document.getElementById('rpm_val').textContent = Math.floor(rpm);
+}
+
+function updateSettings() {
+    const btn = document.getElementById('reloadBtn');
+    const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
+    const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
+    if (p1Lat && p1Lon) {
+        LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
+        LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
+        pulseCount = parseInt(localStorage.getItem('pl1')) || 1; 
+        gpsThresholdValue = parseFloat(localStorage.getItem('gpsThreshold')) || 20; 
+        lapCoolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
+        btn.style.backgroundColor = '#1a1a1a'; btn.textContent = "RELOAD"; return true;
+    }
+    btn.style.backgroundColor = '#FFA500'; btn.textContent = "NO SETTING"; return false;
+}
+
+// --- イベント ---
+document.getElementById('intGpsBtn').onclick = startInternalGps;
+document.getElementById('btConnect').onclick = ble;
+document.getElementById('startBtn').onclick = () => { 
+    if(swState !== 1) { swState = 1; startTime = Date.now(); lapStartTime = startTime; tick(); document.getElementById('startBtn').classList.add('active'); }
+    else { swState = 2; document.getElementById('startBtn').classList.remove('active'); } 
+};
+document.getElementById('lapBtn').onclick = () => { 
+    if(swState === 1) processLap(Date.now(), false);
+    else { swState = 0; lapRecords = []; isFrozen = false; lastLapTime = 0; previousSideOfLine = null;
+        document.getElementById('lap').innerHTML = ""; document.getElementById('display1').textContent = "00:00.000"; document.getElementById('display').textContent = "TOTAL 00:00.000";
+    } 
+};
+document.getElementById('reloadBtn').onclick = () => {
+    demoClickCount++;
+    if (demoClickCount >= 5) { /* デモ切り替え */ } 
+    else { updateSettings(); }
+};
+
+window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight - 60; };
+window.onload = () => { window.dispatchEvent(new Event('resize')); updateSettings(); (function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop); })(); };
+
+</script>
+</body>
+</html>
