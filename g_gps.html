@@ -9,7 +9,7 @@
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--hrc-white); font-family: 'Arial Black', sans-serif; overflow: hidden; }
         #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
         #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
-        .main-ui-container { position: absolute; right: 10px; top: 120px; bottom: 70px; display: flex; align-items: flex-start; gap: 45px; z-index: 20; pointer-events: auto; }
+        .main-ui-container { position: absolute; right: 10px; top: 120px; bottom: 70px; display: flex; align-items: flex-start; gap: 30px; z-index: 20; pointer-events: auto; }
        #info-overlay { 
     display: flex; 
     flex-direction: column; 
@@ -24,14 +24,14 @@
         #display1 { font-size: 18vh; font-weight: 900; line-height: 0.9; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
         #display { font-size: 4vh; color: #bbb; text-shadow: 1px 1px 6px #000; }
         .right-panels { display: flex; flex-direction: row; gap: 15px; height: 100%; align-items: flex-start; }
-        #lap-panel { width: 150px; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #333; }
+        #lap-panel { width: 160px; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #333; }
         #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
         .lap-row { 
     display: flex; 
     /* space-between から flex-end に変更して右側に寄せる */
     justify-content: flex-end; 
     /* L1 と タイムの間の距離をここで指定（例: 15px） */
-    gap: 15px; 
+    gap: 20px; 
     
     padding: 6px 0; 
     border-bottom: 1px solid rgba(255,255,255,0.1); 
@@ -288,6 +288,7 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
 
 
 
