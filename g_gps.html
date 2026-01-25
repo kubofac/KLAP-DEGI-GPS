@@ -24,9 +24,20 @@
         #display1 { font-size: 18vh; font-weight: 900; line-height: 0.9; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
         #display { font-size: 4vh; color: #bbb; text-shadow: 1px 1px 6px #000; }
         .right-panels { display: flex; flex-direction: row; gap: 15px; height: 100%; align-items: flex-start; }
-        #lap-panel { width: 175px; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #333; }
+        #lap-panel { width: 150px; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #333; }
         #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
-        .lap-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 18px; font-weight: 900; }
+        .lap-row { 
+    display: flex; 
+    /* space-between から flex-end に変更して右側に寄せる */
+    justify-content: flex-end; 
+    /* L1 と タイムの間の距離をここで指定（例: 15px） */
+    gap: 15px; 
+    
+    padding: 6px 0; 
+    border-bottom: 1px solid rgba(255,255,255,0.1); 
+    font-size: 18px; 
+    font-weight: 900; 
+}
         .best-lap { color: var(--hrc-red); }
         .data-panel { display: flex; flex-direction: column; gap: 15px; width: 110px; }
         .data-box { display: flex; flex-direction: column; align-items: flex-end; }
@@ -277,5 +288,6 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
 
 
