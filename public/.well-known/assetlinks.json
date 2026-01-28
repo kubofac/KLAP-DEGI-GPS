@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.klapdegigps",
+        "sha256_cert_fingerprints": ["51:AC:75:7A:B7:F6:CB:5E:DF:4E:E8:51:C5:A3:62:29:9A:CF:FD:F7:35:A9:53:88:27:08:B7:56:75:81:D9:E9"]
+      }
+    }]
