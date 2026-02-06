@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>KLAP DEGI GPS - PRO LAYOUT</title>
+    <title>KLAP DEGI GPS - FINAL ADJUST</title>
     <style>
         :root { --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; --hrc-orange: #FFA500; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--hrc-white); font-family: 'Arial Black', sans-serif; overflow: hidden; }
         #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
         #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
         
-        /* メインコンテナ：バーのすぐ下まで引き上げ */
+        /* メインコンテナ：バー直下に配置 */
         .main-ui-container { 
             position: absolute; 
             left: 15px;
             right: 15px; 
-            top: 130px; /* バーの数字に重ならないギリギリまで詰め */
+            top: 110px; 
             bottom: 65px; 
             display: flex; 
             flex-direction: row; 
@@ -33,49 +33,50 @@
             flex-direction: column; 
             align-items: flex-end; 
             text-align: right;
-            padding-right: 40px; 
-            margin-top: -10px; /* タイムは少しだけ上に逃がす */
+            padding-right: 35px; 
+            margin-top: 20px; 
         }
         #rpm_val { font-size: 8vh; font-weight: 900; line-height: 0.8; margin-bottom: 2px; text-shadow: 2px 2px 10px #000; }
         #display1 { font-size: 13vh; font-weight: 900; line-height: 0.8; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
         #display { font-size: 3.8vh; color: #bbb; text-shadow: 1px 1px 6px #000; margin-top: 5px; }
 
-        /* 中央カラム：ラップ履歴 (位置合わせと文字拡大) */
+        /* 中央カラム：ラップ履歴 (28px巨大文字) */
         #lap-panel { 
             width: auto; 
-            min-width: 180px; 
+            min-width: 210px; 
             height: 90%; 
             display: flex; 
             flex-direction: column; 
-            border-top: 2px solid #444; 
+            border-top: 3px solid #444; 
             pointer-events: auto;
-            margin-top: 25px; /* SPEEDの上位置と同期 */
+            margin-top: 15px; 
+            padding-top: 10px; 
         }
         #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
         .lap-row { 
             display: flex; 
             justify-content: space-between; 
             gap: 20px; 
-            padding: 8px 0; /* 行間を広く */
+            padding: 8px 0; 
             border-bottom: 1px solid rgba(255,255,255,0.1); 
-            font-size: 22px; /* 文字を大きく */
+            font-size: 28px; 
             font-weight: 900; 
         }
-        .best-lap { color: var(--hrc-red); }
+        .best-lap { color: var(--hrc-red); text-shadow: 0 0 10px rgba(228,0,43,0.5); }
 
-        /* 右カラム：データパネル (位置合わせ) */
+        /* 右カラム：データパネル (数値サイズ維持) */
         .data-panel { 
-            width: 130px; 
+            width: 120px; 
             display: flex; 
             flex-direction: column; 
             gap: 20px; 
             align-items: flex-end; 
-            margin-top: 25px; /* ラップ履歴の上位置と同期 */
+            margin-top: 15px; 
             height: 100%;
         }
         .data-box { display: flex; flex-direction: column; align-items: flex-end; }
-        .label { font-size: 14px; color: var(--hrc-red); font-weight: bold; margin-bottom: -5px;}
-        .val { font-size: 50px; font-weight: 900; line-height: 0.9; }
+        .label { font-size: 14px; color: var(--hrc-red); font-weight: bold; margin-bottom: -2px;}
+        .val { font-size: 40px; font-weight: 900; line-height: 0.9; }
         
         footer { height: 55px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: fixed; bottom: 0; left: 0; right: 0; }
         button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
@@ -83,11 +84,11 @@
         button.demo-active { animation: demoBlink 1s infinite; background: var(--hrc-orange) !important; color: #000 !important; }
 
         @media screen and (max-width: 900px) {
-            .main-ui-container { top: 125px; }
+            .main-ui-container { top: 110px; }
             #display1 { font-size: 11vh; }
-            #info-overlay { padding-right: 20px; }
-            .lap-row { font-size: 18px; padding: 5px 0; }
-            .val { font-size: 40px; }
+            #info-overlay { padding-right: 15px; }
+            .lap-row { font-size: 22px; padding: 5px 0; }
+            .val { font-size: 32px; }
         }
     </style>
 </head>
@@ -119,6 +120,7 @@
 </div>
 
 <script>
+/* スクリプト部分は以前と同一のため省略なしでそのままお使いいただけます */
 'use strict';
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
 let currentRPM = 0, lastPos = null, lastLapTime = 0;
