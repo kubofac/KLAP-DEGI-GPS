@@ -13,40 +13,54 @@
         #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
         #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
         
-        /* メインUI：iPhone SE等の横幅が狭い画面での重なりを防止 */
-        .main-ui-container { position: absolute; right: 5px; top: 120px; bottom: 70px; display: flex; align-items: flex-start; gap: 30px; z-index: 20; pointer-events: auto; }
-        @media screen and (max-width: 900px) {
-            .main-ui-container { gap: 10px; right: 2px; top: 100px; }
-            #display1 { font-size: 14vh; }
-            #rpm_val { font-size: 10vh; }
-            .val { font-size: 32px; }
-            button { font-size: 9px; }
-        }
-        /* 縦幅が極端に狭いBluefy対策 */
-        @media screen and (max-height: 320px) {
-            .main-ui-container { top: 70px !important; }
-            footer { height: 45px !important; }
+        /* 数値パネル：バー（hY=80px）の下に配置するため top を 160px に設定 */
+        .main-ui-container { 
+            position: absolute; 
+            right: 10px; 
+            top: 160px; 
+            bottom: 70px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-end; 
+            gap: 20px; 
+            z-index: 20; 
+            pointer-events: auto; 
         }
 
-        #info-overlay { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 10px; margin-top: 10px; }
-        #rpm_val { font-size: 13vh; font-weight: 900; line-height: 0.8; margin-top: 10px; text-shadow: 3px 3px 12px #000; }
+        #info-overlay { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 5px; }
+        #rpm_val { font-size: 13vh; font-weight: 900; line-height: 0.8; text-shadow: 3px 3px 12px #000; }
         #display1 { font-size: 18vh; font-weight: 900; line-height: 0.9; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
         #display { font-size: 4vh; color: #bbb; text-shadow: 1px 1px 6px #000; }
+        
         .right-panels { display: flex; flex-direction: row; gap: 15px; height: 100%; align-items: flex-start; }
         #lap-panel { width: 160px; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #333; }
-        @media screen and (max-width: 900px) { #lap-panel { width: 120px; } }
         #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
         .lap-row { display: flex; justify-content: flex-end; gap: 20px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 18px; font-weight: 900; }
         .best-lap { color: var(--hrc-red); }
+        
         .data-panel { display: flex; flex-direction: column; gap: 15px; width: 110px; }
         .data-box { display: flex; flex-direction: column; align-items: flex-end; }
         .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
         .val { font-size: 40px; font-weight: 900; line-height: 0.9; }
         
         footer { height: 55px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: fixed; bottom: 0; left: 0; right: 0; }
-        button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         button.active { background: var(--hrc-red) !important; color: #fff !important; }
         button.demo-active { animation: demoBlink 1s infinite; background: var(--hrc-orange) !important; color: #000 !important; }
+        
+        /* スマホ/iPhone SE 横持ち用の調整 */
+        @media screen and (max-width: 900px) {
+            .main-ui-container { top: 140px; gap: 10px; }
+            #display1 { font-size: 15vh; }
+            #lap-panel { width: 120px; }
+            .val { font-size: 32px; }
+            button { font-size: 9px; }
+        }
+        @media screen and (max-height: 350px) {
+            .main-ui-container { top: 130px; }
+            footer { height: 45px; }
+        }
+
         @keyframes demoBlink { 0% {opacity: 1;} 50% {opacity: 0.6;} 100% {opacity: 1;} }
     </style>
 </head>
@@ -88,11 +102,11 @@ let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 let lastGpsDataTime = 0, lastBleDataTime = 0, isGpsFixed = false, watchId = null;
 let isFrozen = false, freezeDisplayTime = "", freezeStartTime = 0, previousSideOfLine = null;
 let wakeLock = null;
-
 let isDemoMode = false, demoClickCount = 0, demoInterval = null;
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
+// --- ユーティリティ ---
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const f1 = lat1 * Math.PI / 180, f2 = lat2 * Math.PI / 180;
@@ -119,6 +133,7 @@ function getIntersectionTime(p1, p2) {
     return (t_ratio >= 0 && t_ratio <= 1) ? p1.time + (p2.time - p1.time) * t_ratio : null;
 }
 
+// --- GPS & Bluetooth ---
 async function requestWakeLock() {
     try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
@@ -129,7 +144,7 @@ function startInternalGps() {
     const options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 };
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     watchId = navigator.geolocation.watchPosition(pos => {
-        lastGpsDataTime = Date.now(); isGpsFixed = true;
+        lastGpsDataTime = Date.now();
         const speedKmh = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
         document.getElementById('speed_val').textContent = speedKmh;
         const currentPos = { lat: pos.coords.latitude, lon: pos.coords.longitude, time: Date.now() };
@@ -147,26 +162,7 @@ function startInternalGps() {
             previousSideOfLine = currentSide;
         }
         lastPos = currentPos;
-    }, err => { isGpsFixed = false; }, options);
-}
-
-function toggleDemoMode() {
-    if (isDemoMode) {
-        clearInterval(demoInterval); isDemoMode = false; currentRPM = 0;
-        document.getElementById('speed_val').textContent = "0";
-        document.getElementById('reloadBtn').classList.remove('demo-active');
-        document.getElementById('reloadBtn').textContent = "RELOAD";
-    } else {
-        isDemoMode = true;
-        document.getElementById('reloadBtn').classList.add('demo-active');
-        document.getElementById('reloadBtn').textContent = "DEMO RUN";
-        if (swState !== 1) document.getElementById('startBtn').click();
-        demoInterval = setInterval(() => {
-            currentRPM = Math.floor(Math.random() * 4000) + 8000;
-            document.getElementById('speed_val').textContent = Math.floor(Math.random() * 40) + 120;
-            if (Date.now() - lastLapTime > 25000) processLap(Date.now(), true);
-        }, 100);
-    }
+    }, err => {}, options);
 }
 
 async function ble() {
@@ -174,22 +170,17 @@ async function ble() {
     try {
         const bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
         const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID);
-        
-        // 接続成功：色を変える
         btn.classList.add('active');
         btn.textContent = "BLE CONNECTED";
-
         const pC = await service.getCharacteristic(PULSE_UUID), tC = await service.getCharacteristic(TEMP_UUID);
         await pC.startNotifications();
         pC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount; };
         await tC.startNotifications();
         tC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); document.getElementById('temp_val').textContent = e.target.value.getUint8(0); };
-    } catch (e) { 
-        console.error(e); 
-        btn.classList.remove('active');
-    }
+    } catch (e) { btn.classList.remove('active'); }
 }
 
+// --- ロジック ---
 function processLap(exactTime, useFreeze) {
     const lapTime = exactTime - (lapStartTime || startTime);
     lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
@@ -219,30 +210,22 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-setInterval(() => {
-    const now = Date.now();
-    document.getElementById('intGpsBtn').className = (now - lastGpsDataTime < 2500 && lastGpsDataTime !== 0) ? 'active' : '';
-    // BLEボタンのクラス管理は接続イベント側で行うが、通信途絶検知として維持
-    if (now - lastBleDataTime > 3000 && lastBleDataTime !== 0) {
-        document.getElementById('btConnect').classList.remove('active');
-        document.getElementById('btConnect').textContent = "BLE START";
-    }
-}, 1000);
-
+// --- 描画 ---
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // iPhone対策：画面幅が狭い場合は右側250pxを避けて描画
-    let w = canvas.width;
-    if (window.innerWidth < 900) { w = canvas.width - 250; }
-    
-    const h = canvas.height, segments = 75, active = Math.floor((rpm / 14000) * segments);
+    const w = canvas.width, h = canvas.height, segments = 75, active = Math.floor((rpm / 14000) * segments);
     const sX = 20, hY = 80, bY = h - 20, rad = bY - hY, curveEnd = 30;
     
     for (let i = 0; i <= segments; i++) {
         let x, y, ang, prog;
-        if (i <= curveEnd) { prog = i / curveEnd; ang = Math.PI + (prog * (Math.PI / 2)); x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad; }
-        else { prog = (i - curveEnd) / (segments - curveEnd); x = (sX + rad) + (prog * (w - 15 - (sX + rad))); y = hY; ang = 1.5 * Math.PI; }
+        if (i <= curveEnd) { 
+            prog = i / curveEnd; ang = Math.PI + (prog * (Math.PI / 2)); 
+            x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad; 
+        } else { 
+            prog = (i - curveEnd) / (segments - curveEnd); 
+            x = (sX + rad) + (prog * (w - 15 - (sX + rad))); 
+            y = hY; ang = 1.5 * Math.PI; 
+        }
         if (i % 10 === 0 || i === segments) {
             ctx.save(); ctx.fillStyle = i < active ? "#fff" : "#444"; ctx.font = "italic bold 22px Arial"; ctx.textAlign = "center";
             ctx.fillText(Math.round((i / segments) * 14), x + Math.cos(ang) * 45, y + Math.sin(ang) * 45); ctx.restore();
@@ -255,18 +238,15 @@ function drawTacho(rpm) {
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
+// --- 設定・初期化 ---
 function updateSettings() {
     const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
     const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
     const btn = document.getElementById('reloadBtn');
-
-    // 未設定ならオレンジ色にする
     if (!p1Lat || !p1Lon || !p2Lat || !p2Lon) {
-        btn.style.backgroundColor = "var(--hrc-orange)";
-        btn.style.color = "#000";
+        btn.style.backgroundColor = "var(--hrc-orange)"; btn.style.color = "#000";
     } else {
-        btn.style.backgroundColor = "";
-        btn.style.color = "";
+        btn.style.backgroundColor = ""; btn.style.color = "";
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
         pulseCount = parseInt(localStorage.getItem('pl1')) || 1;
@@ -277,6 +257,25 @@ function updateSettings() {
     return false;
 }
 
+function toggleDemoMode() {
+    if (isDemoMode) {
+        clearInterval(demoInterval); isDemoMode = false; currentRPM = 0;
+        document.getElementById('reloadBtn').classList.remove('demo-active');
+        document.getElementById('reloadBtn').textContent = "RELOAD";
+    } else {
+        isDemoMode = true;
+        document.getElementById('reloadBtn').classList.add('demo-active');
+        document.getElementById('reloadBtn').textContent = "DEMO RUN";
+        if (swState !== 1) document.getElementById('startBtn').click();
+        demoInterval = setInterval(() => {
+            currentRPM = Math.floor(Math.random() * 4000) + 8000;
+            document.getElementById('speed_val').textContent = Math.floor(Math.random() * 40) + 120;
+            if (Date.now() - lastLapTime > 25000) processLap(Date.now(), true);
+        }, 100);
+    }
+}
+
+// --- イベント ---
 document.getElementById('intGpsBtn').onclick = startInternalGps;
 document.getElementById('btConnect').onclick = ble;
 document.getElementById('startBtn').onclick = () => {
@@ -289,23 +288,26 @@ document.getElementById('lapBtn').onclick = () => {
         document.getElementById('lap').innerHTML = ""; document.getElementById('display1').textContent = "00:00.000"; document.getElementById('display').textContent = "TOTAL 00:00.000";
     }
 };
-
 document.getElementById('reloadBtn').onclick = () => {
     demoClickCount++;
     setTimeout(() => { demoClickCount = 0; }, 2000);
-    if (demoClickCount >= 5) { toggleDemoMode(); } 
-    else { updateSettings(); }
+    if (demoClickCount >= 5) { toggleDemoMode(); } else { updateSettings(); }
 };
 
+setInterval(() => {
+    const now = Date.now();
+    document.getElementById('intGpsBtn').className = (now - lastGpsDataTime < 2500 && lastGpsDataTime !== 0) ? 'active' : '';
+    if (now - lastBleDataTime > 3000 && lastBleDataTime !== 0) {
+        document.getElementById('btConnect').classList.remove('active');
+        document.getElementById('btConnect').textContent = "BLE START";
+    }
+}, 1000);
+
 window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight - 60; };
-
-// iOS/Bluefy安定化のためのイベント
 window.addEventListener('pageshow', updateSettings);
-
 window.onload = () => { 
     window.dispatchEvent(new Event('resize')); 
-    updateSettings(); 
-    // iPhoneのストレージ読み込み遅延対策
+    updateSettings();
     setTimeout(updateSettings, 500);
     (function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop); })(); 
 };
