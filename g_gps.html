@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>KLAP DEGI INTERNAL GPS</title>
     <style>
         :root { --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; --hrc-orange: #FFA500; }
@@ -12,58 +11,75 @@
         #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
         #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
         
-        /* 3カラムレイアウト設定 */
+        /* 3カラムレイアウト：左(TIME)・中(LAP履歴)・右(SPEED/TEMP) */
         .main-ui-container { 
             position: absolute; 
             left: 15px;
             right: 15px; 
-            top: 155px; /* タコメーターバーの下に配置 */
-            bottom: 70px; 
+            top: 140px; 
+            bottom: 65px; 
             display: flex; 
             flex-direction: row; 
             justify-content: space-between; 
-            align-items: flex-end; 
+            align-items: flex-start; /* 上寄せにしてタイムを上げる */
             z-index: 20; 
             pointer-events: none; 
         }
 
-        /* 左カラム：ラップ履歴 */
-        #lap-panel { width: 180px; height: 100%; display: flex; flex-direction: column; border-top: 2px solid #444; pointer-events: auto; }
+        /* 左カラム：メインタイム */
+        #info-overlay { 
+            width: 40%; /* 少し広めに確保 */
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-start; 
+            text-align: left;
+            padding-top: 5px;
+        }
+        #rpm_val { font-size: 9vh; font-weight: 900; line-height: 0.8; margin-bottom: 2px; text-shadow: 2px 2px 10px #000; }
+        #display1 { font-size: 13vh; font-weight: 900; line-height: 0.8; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
+        #display { font-size: 3.5vh; color: #bbb; text-shadow: 1px 1px 6px #000; margin-top: 5px; }
+
+        /* 中央カラム：ラップ履歴 */
+        #lap-panel { 
+            flex: 1;
+            height: 90%; 
+            display: flex; 
+            flex-direction: column; 
+            border-top: 2px solid #444; 
+            pointer-events: auto;
+            margin: 0 20px;
+            margin-top: 30px; /* バーとの距離を少し取る */
+        }
         #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
         .lap-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 18px; font-weight: 900; }
         .best-lap { color: var(--hrc-red); }
 
-        /* 中央カラム：メイン表示（RPM/LAP/TOTAL） */
-        #info-overlay { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; }
-        #rpm_val { font-size: 11vh; font-weight: 900; line-height: 0.8; margin-bottom: 5px; text-shadow: 2px 2px 10px #000; }
-        #display1 { font-size: 15vh; font-weight: 900; line-height: 0.9; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
-        #display { font-size: 4vh; color: #bbb; text-shadow: 1px 1px 6px #000; }
-
-        /* 右カラム：SPEED & TEMP */
-        .data-panel { width: 120px; display: flex; flex-direction: column; gap: 15px; align-items: flex-end; }
+        /* 右カラム：データパネル */
+        .data-panel { 
+            width: 120px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            align-items: flex-end; 
+            justify-content: flex-end;
+            height: 100%;
+            padding-bottom: 10px;
+        }
         .data-box { display: flex; flex-direction: column; align-items: flex-end; }
         .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
-        .val { font-size: 40px; font-weight: 900; line-height: 0.9; }
+        .val { font-size: 42px; font-weight: 900; line-height: 0.9; }
         
-        /* フッターボタン */
         footer { height: 55px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: fixed; bottom: 0; left: 0; right: 0; }
-        button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
         button.active { background: var(--hrc-red) !important; color: #fff !important; }
         button.demo-active { animation: demoBlink 1s infinite; background: var(--hrc-orange) !important; color: #000 !important; }
 
-        /* レスポンシブ調整（iPhone SE等） */
         @media screen and (max-width: 900px) {
-            .main-ui-container { top: 140px; }
-            #lap-panel { width: 140px; }
-            #display1 { font-size: 12vh; }
+            .main-ui-container { top: 125px; }
+            #display1 { font-size: 11vh; }
             .val { font-size: 32px; }
             .lap-row { font-size: 15px; }
         }
-        @media screen and (max-height: 350px) {
-            .main-ui-container { top: 130px; }
-            footer { height: 45px; }
-        }
-        @keyframes demoBlink { 0% {opacity: 1;} 50% {opacity: 0.6;} 100% {opacity: 1;} }
     </style>
 </head>
 <body>
@@ -71,13 +87,13 @@
 <div id="dashboard">
     <canvas id="canvas"></canvas>
     <div class="main-ui-container">
-        <div id="lap-panel"><div id="lap"></div></div>
-        
         <div id="info-overlay">
             <div id="rpm_val">0</div>
             <div id="display1">00:00.000</div>
             <div id="display">TOTAL 00:00.000</div>
         </div>
+
+        <div id="lap-panel"><div id="lap"></div></div>
         
         <div class="data-panel">
             <div class="data-box"><div class="label">SPEED</div><div class="val" id="speed_val">0</div></div>
@@ -106,7 +122,6 @@ let wakeLock = null, isDemoMode = false, demoClickCount = 0, demoInterval = null
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- 測地系計算 ---
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const f1 = lat1 * Math.PI / 180, f2 = lat2 * Math.PI / 180;
@@ -120,7 +135,7 @@ function calculatePerpendicularFootApprox(l1, l2, p) {
     if (lenSq < 1e-9) return l1;
     const t = ((p.lon - l1.lon) * dx + (p.lat - l1.lat) * dy) / lenSq;
     const ct = Math.max(0, Math.min(1, t));
-    return { lat: l1.lat + ct * dy, lon: l1.lon + ct * dx };
+    return { lat: l1.lat + ct * dy, lon: l1.lat + ct * dx };
 }
 function getSideOfLine(pLat, pLon, l1Lat, l1Lon, l2Lat, l2Lon) {
     return (l2Lon - l1Lon) * (pLat - l1Lat) - (l2Lat - l1Lat) * (pLon - l1Lon);
@@ -133,7 +148,6 @@ function getIntersectionTime(p1, p2) {
     return (t_ratio >= 0 && t_ratio <= 1) ? p1.time + (p2.time - p1.time) * t_ratio : null;
 }
 
-// --- GPS / BLE / WAKELOCK ---
 async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {} }
 
 function startInternalGps() {
@@ -177,7 +191,6 @@ async function ble() {
     } catch (e) { btn.classList.remove('active'); }
 }
 
-// --- ラップ処理 / 描画 ---
 function processLap(exactTime, useFreeze) {
     const lapTime = exactTime - (lapStartTime || startTime);
     lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
@@ -232,7 +245,6 @@ function drawTacho(rpm) {
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
-// --- システム設定 ---
 function updateSettings() {
     const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
     const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
@@ -269,7 +281,6 @@ function toggleDemoMode() {
     }
 }
 
-// --- イベント ---
 document.getElementById('intGpsBtn').onclick = startInternalGps;
 document.getElementById('btConnect').onclick = ble;
 document.getElementById('startBtn').onclick = () => {
