@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>KLAP DEGI GPS - ULTIMATE EDITION</title>
+    <title>KLAP DEGI GPS - SMART MAXIMIZE</title>
     <style>
         :root { --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; --hrc-orange: #FFA500; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--hrc-white); font-family: 'Arial Black', sans-serif; overflow: hidden; }
         #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
         #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
         
-        /* 3カラム・コンテナ */
+        /* 全体コンテナ */
         .main-ui-container { 
             position: absolute; 
             left: 0; right: 0; 
-            top: 105px; /* バーの直下 */
-            bottom: 65px; /* フッターの上 */
+            top: 105px; 
+            bottom: 65px; 
             display: flex; 
             flex-direction: row; 
             z-index: 20; 
@@ -24,8 +24,8 @@
             padding: 0 15px;
         }
 
-        /* 左：メイン情報（バーのカーブを避けて縦中央配置） */
-        #info-overlay { 
+        /* 【可変セクション】回転数・ラップ・TOTAL：残りの幅をすべて使い、縦中央に配置 */
+        #variable-info-section { 
             flex: 1; 
             display: flex; 
             flex-direction: column; 
@@ -33,14 +33,18 @@
             align-items: flex-end; 
             text-align: right;
             height: 100%; 
-            padding-left: 120px; /* 左側のバー描画領域を完全に避ける */
-            padding-right: 40px; /* 中央の履歴との隙間 */
+            padding-left: 120px; /* バーのカーブを避ける */
+            padding-right: 30px; /* 履歴との間隔 */
+            overflow: hidden;
         }
-        #rpm_val { font-size: 11vh; font-weight: 900; line-height: 0.8; margin-bottom: 0px; text-shadow: 2px 2px 10px #000; }
-        #display1 { font-size: 20vh; font-weight: 900; line-height: 0.8; color: var(--hrc-white); text-shadow: 4px 4px 20px #000; letter-spacing: -2px; }
-        #display { font-size: 5vh; color: #bbb; text-shadow: 1px 1px 6px #000; margin-top: 10px; }
+        
+        /* 画面の幅と高さに応じて、他の要素にぶつからないよう自動サイズ調整 */
+        /* 1000px以上の幅なら特大、それ以下なら自動縮小 */
+        #rpm_val { font-size: clamp(40px, 10vh, 100px); font-weight: 900; line-height: 0.8; margin-bottom: 5px; text-shadow: 2px 2px 10px #000; }
+        #display1 { font-size: clamp(60px, 20vh, 180px); font-weight: 900; line-height: 0.8; color: var(--hrc-white); text-shadow: 4px 4px 20px #000; letter-spacing: -2px; white-space: nowrap; }
+        #display { font-size: clamp(18px, 5vh, 45px); color: #bbb; text-shadow: 1px 1px 6px #000; margin-top: 5px; white-space: nowrap; }
 
-        /* 中：ラップ履歴（最小幅・バー直下） */
+        /* 【固定セクション】ラップ履歴：サイズ・位置固定 */
         #lap-panel { 
             width: 180px; 
             height: 100%; 
@@ -57,15 +61,14 @@
             gap: 8px; 
             padding: 4px 0; 
             border-bottom: 1px solid rgba(255,255,255,0.1); 
-            font-size: 26px; 
+            font-size: 26px; /* 固定サイズ */
             font-weight: 900; 
             line-height: 1.1;
             align-items: baseline; 
         }
         .lap-row span:first-child { color: #777; font-size: 22px; }
-        .best-lap { color: var(--hrc-red); text-shadow: 0 0 15px rgba(228,0,43,0.5); }
 
-        /* 右：SPEED/TEMP（最小幅・バー直下） */
+        /* 【固定セクション】SPEED/TEMP：サイズ・位置固定 */
         .data-panel { 
             width: 100px; 
             display: flex; 
@@ -83,7 +86,6 @@
         footer { height: 55px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: fixed; bottom: 0; left: 0; right: 0; }
         button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
         button.active { background: var(--hrc-red) !important; color: #fff !important; }
-        .demo-active { border-color: var(--hrc-orange) !important; color: var(--hrc-orange) !important; }
     </style>
 </head>
 <body>
@@ -91,7 +93,7 @@
 <div id="dashboard">
     <canvas id="canvas"></canvas>
     <div class="main-ui-container">
-        <div id="info-overlay">
+        <div id="variable-info-section">
             <div id="rpm_val">0</div>
             <div id="display1">00:00.000</div>
             <div id="display">TOTAL 00:00.000</div>
@@ -114,6 +116,7 @@
 </div>
 
 <script>
+/* ロジック部分はこれまでと同じものを適用してください */
 'use strict';
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
 let currentRPM = 0, lastPos = null, lastLapTime = 0;
