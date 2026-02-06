@@ -11,47 +11,48 @@
         #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
         #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
         
-        /* 3カラムレイアウト：左(TIME)・中(LAP履歴)・右(SPEED/TEMP) */
+        /* メインコンテナ：バーに被らないよう top を調整 */
         .main-ui-container { 
             position: absolute; 
             left: 15px;
             right: 15px; 
-            top: 140px; 
+            top: 155px; /* バーの数字（hY=80 + 文字45）を避けるための高さ */
             bottom: 65px; 
             display: flex; 
             flex-direction: row; 
             justify-content: space-between; 
-            align-items: flex-start; /* 上寄せにしてタイムを上げる */
+            align-items: flex-start; 
             z-index: 20; 
             pointer-events: none; 
         }
 
-        /* 左カラム：メインタイム */
+        /* 左カラム：タイム類（右寄せにして中央履歴に寄せる） */
         #info-overlay { 
-            width: 40%; /* 少し広めに確保 */
+            flex: 1;
             display: flex; 
             flex-direction: column; 
-            align-items: flex-start; 
-            text-align: left;
-            padding-top: 5px;
+            align-items: flex-end; /* 右寄せ */
+            text-align: right;
+            padding-right: 30px; /* 中央の履歴との間の「少しの間」 */
+            margin-top: 5px; /* バーとの微調整 */
         }
         #rpm_val { font-size: 9vh; font-weight: 900; line-height: 0.8; margin-bottom: 2px; text-shadow: 2px 2px 10px #000; }
         #display1 { font-size: 13vh; font-weight: 900; line-height: 0.8; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
         #display { font-size: 3.5vh; color: #bbb; text-shadow: 1px 1px 6px #000; margin-top: 5px; }
 
-        /* 中央カラム：ラップ履歴 */
+        /* 中央カラム：ラップ履歴（幅を最小限に） */
         #lap-panel { 
-            flex: 1;
+            width: auto; /* 幅を中身に合わせる */
+            min-width: 140px; /* 最小幅 */
             height: 90%; 
             display: flex; 
             flex-direction: column; 
             border-top: 2px solid #444; 
             pointer-events: auto;
-            margin: 0 20px;
-            margin-top: 30px; /* バーとの距離を少し取る */
+            margin-top: 35px; /* バーより若干下げる */
         }
         #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
-        .lap-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 18px; font-weight: 900; }
+        .lap-row { display: flex; justify-content: space-between; gap: 15px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 17px; font-weight: 900; }
         .best-lap { color: var(--hrc-red); }
 
         /* 右カラム：データパネル */
@@ -67,7 +68,7 @@
         }
         .data-box { display: flex; flex-direction: column; align-items: flex-end; }
         .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
-        .val { font-size: 42px; font-weight: 900; line-height: 0.9; }
+        .val { font-size: 40px; font-weight: 900; line-height: 0.9; }
         
         footer { height: 55px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: fixed; bottom: 0; left: 0; right: 0; }
         button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
@@ -75,10 +76,11 @@
         button.demo-active { animation: demoBlink 1s infinite; background: var(--hrc-orange) !important; color: #000 !important; }
 
         @media screen and (max-width: 900px) {
-            .main-ui-container { top: 125px; }
-            #display1 { font-size: 11vh; }
+            .main-ui-container { top: 135px; }
+            #display1 { font-size: 10vh; }
+            #info-overlay { padding-right: 15px; }
+            #lap-panel { min-width: 120px; }
             .val { font-size: 32px; }
-            .lap-row { font-size: 15px; }
         }
     </style>
 </head>
