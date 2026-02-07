@@ -128,39 +128,40 @@ async function ble() {
         });
 
         const server = await bleDevice.gatt.connect();
-        // 接続直後に長めの待機（iPad OSが通信を安定させる時間）
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
+        await new Promise(resolve => setTimeout(resolve, 1500));
         const service = await server.getPrimaryService(SERVICE_UUID);
 
         // --- RPM設定 ---
-        try {
-            const pC = await service.getCharacteristic(PULSE_UUID);
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            await pC.startNotifications();
-            pC.oncharacteristicvaluechanged = (e) => {
-                lastBleDataTime = Date.now();
-                let raw = e.target.value.byteLength >= 2 ? e.target.value.getUint16(0, true) : e.target.value.getUint8(0);
-                currentRPM = (raw * 60) / (window.pulseCount || 1);
+        const pC = await service.getCharacteristic(PULSE_UUID);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await pC.startNotifications();
+        pC.oncharacteristicvaluechanged = (e) => {
+            lastBleDataTime = Date.now();
+            const data = e.target.value;
+            
+            // 【重要】もしデータが届いていれば、一時的にRPMの場所に生データ情報を出します
+            if (data.byteLength > 0) {
+                let val = data.byteLength >= 2 ? data.getUint16(0, true) : data.getUint8(0);
+                const pCount = (window.pulseCount && window.pulseCount > 0) ? window.pulseCount : 1;
+                currentRPM = (val * 60) / pCount;
                 document.getElementById('rpm_val').textContent = Math.floor(currentRPM);
-            };
-        } catch (err) {
-            console.log("RPM Notification failed, skipping to TEMP...");
-        }
+            } else {
+                document.getElementById('rpm_val').textContent = "EMPTY";
+            }
+        };
 
-        // --- 温度設定 (RPMが失敗しても実行されるように独立させる) ---
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        try {
-            const tC = await service.getCharacteristic(TEMP_UUID);
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            await tC.startNotifications();
-            tC.oncharacteristicvaluechanged = (e) => {
-                lastBleDataTime = Date.now();
-                document.getElementById('temp_val').textContent = e.target.value.getUint8(0);
-            };
-        } catch (err) {
-            console.log("TEMP Notification failed");
-        }
+        // --- 温度設定 ---
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        const tC = await service.getCharacteristic(TEMP_UUID);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await tC.startNotifications();
+        tC.oncharacteristicvaluechanged = (e) => {
+            lastBleDataTime = Date.now();
+            const temp = e.target.value.getUint8(0);
+            // デバッグ：温度が届いたら背景色を少し変えるなどの合図
+            document.getElementById('temp_val').textContent = temp;
+            document.getElementById('temp_val').style.color = "#00FF00"; // 緑色に光らせる
+        };
 
         btn.classList.remove('searching');
         btn.classList.add('active');
@@ -169,7 +170,7 @@ async function ble() {
     } catch (e) {
         btn.classList.remove('searching', 'active');
         btn.textContent = "BLE ERR";
-        alert("iPad System Error: " + e.message);
+        alert("Success but Error: " + e.message);
     }
 }
 function processLap(exactTime, useFreeze) { const lapTime = exactTime - (lapStartTime || startTime); lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime; const d = document.getElementById('lap'); d.innerHTML = ""; const best = Math.min(...lapRecords); lapRecords.forEach((t, i) => { const r = document.createElement('div'); r.className = `lap-row ${t === best ? 'best-lap' : ''}`; r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; d.appendChild(r); }); if (useFreeze) { isFrozen = true; freezeDisplayTime = timeFormat(lapTime); freezeStartTime = Date.now(); } }
@@ -200,6 +201,7 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
 
 
 
