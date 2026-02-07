@@ -2,219 +2,148 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="mobile-web-app-capable" content="yes">
-
-
-    
-    <title>GPS設定ツール (Internal GPS版)</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-
-  <link rel="manifest" href="/manifest.json">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>KLAP DEGI GPS - MINIMAL UI</title>
     <style>
-        body { font-family: sans-serif; padding: 10px; background-color: #f0f0f0; margin: 0; }
-        #map-container { position: relative; width: 94%; margin: 10px auto; }
-        #mapid { height: 350px; width: 100%; border-radius: 8px; z-index: 1; }
-        #map-controls { 
-            position: absolute; top: 10px; right: 10px; z-index: 1000; 
-            background: rgba(255,255,255,0.9); padding: 5px; border-radius: 5px; 
-            display: flex; flex-direction: column; gap: 5px;
+        :root { --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; --hrc-orange: #FFA500; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--hrc-white); font-family: 'Arial Black', sans-serif; overflow: hidden; }
+        #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
+        #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
+        
+        .main-ui-container { position: absolute; left: 0; right: 0; top: 115px; bottom: 65px; z-index: 20; pointer-events: none; }
+
+        #variable-info-section { 
+            position: absolute; left: 0; top: 0; bottom: 0; right: 285px; 
+            display: flex; flex-direction: column; justify-content: center; align-items: flex-end; 
+            text-align: right; padding-left: 110px; overflow: hidden;
         }
-        .control-group { background: white; padding: 15px; border-radius: 8px; margin: 10px auto; width: 94%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); box-sizing: border-box; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        select, button { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
-        button { background-color: #444; color: white; border: none; font-weight: bold; cursor: pointer; }
-        button:active { background-color: #222; }
-        .btn-p1 { background-color: #d9534f; }
-        .btn-p2 { background-color: #0275d8; }
-        .btn-decide { background-color: #5cb85c; font-size: 18px; margin-top: 10px; }
-        .nav-button { background-color: #f0ad4e; color: #000; font-size: 18px; margin-top: 10px; }
-        .result-text { font-size: 13px; font-weight: bold; color: #007bff; margin-bottom: 5px; }
-        #instructionMessage { color: #d9534f; font-weight: bold; font-size: 14px; padding: 0 15px; }
+        #rpm_val { font-size: clamp(25px, 11vh, 110px); font-weight: 900; line-height: 0.7; margin-bottom: 10px; text-shadow: 2px 2px 8px #000; }
+        #display1 { font-size: clamp(38px, 19vh, 160px); font-weight: 900; line-height: 0.8; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; letter-spacing: -2px; white-space: nowrap; }
+        #display { font-size: clamp(12px, 4.5vh, 36px); color: #bbb; text-shadow: 1px 1px 5px #000; margin-top: 5px; white-space: nowrap; }
+
+        #lap-panel { position: absolute; right: 100px; width: 165px; height: 100%; display: flex; flex-direction: column; border-top: 2px solid #444; pointer-events: auto; padding-top: 10px; }
+        #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
+        .lap-row { display: flex; gap: 5px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 21px; font-weight: 900; align-items: baseline; }
+        .lap-row span:first-child { color: #777; font-size: 15px; width: 28px; }
+        .best-lap { color: var(--hrc-red); }
+
+        .data-panel { position: absolute; right: 5px; width: 85px; height: 100%; display: flex; flex-direction: column; gap: 15px; align-items: flex-end; padding-top: 10px; }
+        .data-box { display: flex; flex-direction: column; align-items: flex-end; }
+        .label { font-size: 10px; color: var(--hrc-red); font-weight: bold; margin-bottom: -2px;}
+        .val { font-size: 36px; font-weight: 900; line-height: 0.9; }
+        
+        footer { height: 55px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: fixed; bottom: 0; left: 0; right: 0; }
+        button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 9px; font-weight: bold; transition: background 0.2s; }
+        
+        /* 稼働中：赤背景（枠線なし） */
+        button.active { background: var(--hrc-red) !important; color: #fff !important; border-color: transparent !important; }
+
+        /* 準備中：オレンジ点滅 */
+        button.searching { background: var(--hrc-orange) !important; color: #000 !important; animation: blink 0.8s infinite alternate; border-color: transparent !important; }
+        @keyframes blink { from { opacity: 1; } to { opacity: 0.4; } }
     </style>
 </head>
 <body>
-    <h2 style="text-align:center;">GPS設定</h2>
-    <p id="instructionMessage">現在地を取得中...</p>
 
-    <div id="map-container">
-        <div id="mapid"></div>
-        <div id="map-controls">
-            <button class="btn-p1" id="btnP1">P1(左端)設置</button>
-            <button class="btn-p2" id="btnP2">P2(右端)設置</button>
+<div id="dashboard">
+    <canvas id="canvas"></canvas>
+    <div class="main-ui-container">
+        <div id="variable-info-section">
+            <div id="rpm_val">0</div>
+            <div id="display1">00:00.000</div>
+            <div id="display">TOTAL 00:00.000</div>
+        </div>
+        <div id="lap-panel"><div id="lap"></div></div>
+        <div class="data-panel">
+            <div class="data-box"><div class="label">SPEED</div><div class="val" id="speed_val">0</div></div>
+            <div class="data-box"><div class="label">TEMP</div><div class="val" id="temp_val">--</div></div>
         </div>
     </div>
+    <footer>
+        <button id="intGpsBtn">INT GPS</button>
+        <button id="btConnect">BLE START</button>
+        <button id="startBtn">TIMER</button>
+        <button id="lapBtn">LAP/RESET</button>
+        <button id="reloadBtn">RELOAD</button>
+    </footer>
+</div>
 
-    <div class="control-group">
-        <div id="clickCoordinates" class="result-text" style="color:#555;">保存済み: -- / --</div>
-        <button class="btn-decide" id="btnDecide">スタートラインを保存</button>
-        <button class="nav-button" onclick="location.href='g_gps.html'">タイマー画面へ移動</button>
-    </div>
+<script>
+'use strict';
+const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
+let currentRPM = 0, lastPos = null, lastLapTime = 0, LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
+let gpsThresholdValue = 20, lapCoolDown = 15000, pulseCount = 1, swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
+let lastGpsDataTime = 0, lastBleDataTime = 0, watchId = null, isFrozen = false, freezeDisplayTime = "", freezeStartTime = 0, previousSideOfLine = null;
+let wakeLock = null, isDemoMode = false, demoClickCount = 0, demoInterval = null;
+const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-    <div class="control-group">
-        <label>サーキット選択:</label>
-        <select id="circuitSelect"><option value="">-- プリセットから選択 --</option></select>
-        <button id="saveCircuitButton">サーキットを適用</button>
-        <div id="selectedCircuitDisplay" class="result-text">未選択</div>
-    </div>
+function calculateDistance(lat1, lon1, lat2, lon2) { const R = 6371e3; const f1 = lat1 * Math.PI / 180, f2 = lat2 * Math.PI / 180; const df = (lat2 - lat1) * Math.PI / 180, dl = (lon2 - lon1) * Math.PI / 180; const a = Math.sin(df/2)**2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl/2)**2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); }
+function calculatePerpendicularFootApprox(l1, l2, p) { const dx = l2.lon - l1.lon, dy = l2.lat - l1.lat; const lenSq = dx*dx + dy*dy; if (lenSq < 1e-9) return l1; const t = ((p.lon - l1.lon) * dx + (p.lat - l1.lat) * dy) / lenSq; const ct = Math.max(0, Math.min(1, t)); return { lat: l1.lat + ct * dy, lon: l1.lat + ct * dx }; }
+function getSideOfLine(pLat, pLon, l1Lat, l1Lon, l2Lat, l2Lon) { return (l2Lon - l1Lon) * (pLat - l1Lat) - (l2Lat - l1Lat) * (pLon - l1Lon); }
+function getIntersectionTime(p1, p2) { const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon); if (Math.abs(den) < 1e-12) return null; const t_num = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (LAP_LINE_P1.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (LAP_LINE_P1.lon - p1.lon); const t_ratio = t_num / den; return (t_ratio >= 0 && t_ratio <= 1) ? p1.time + (p2.time - p1.time) * t_ratio : null; }
+async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {} }
 
-    <div class="control-group">
-        <label>点火パルス数 (1回転あたり):</label>
-        <select id="pulseSelect">
-            <option value="0.5">0.5</option><option value="1" selected>1</option>
-            <option value="2">2</option><option value="3">3</option><option value="4">4</option>
-        </select>
-        <button id="savePulseButton">パルス数を保存</button>
-        <div id="setPulse" class="result-text">設定なし</div>
-    </div>
+function startInternalGps() { 
+    if (!("geolocation" in navigator)) { alert("GPS非対応"); return; } 
+    requestWakeLock(); 
+    const gpsBtn = document.getElementById('intGpsBtn');
+    gpsBtn.classList.add('searching');
+    gpsBtn.textContent = "SEARCHING...";
+    const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }; 
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId); 
+    watchId = navigator.geolocation.watchPosition(pos => { 
+        gpsBtn.classList.remove('searching');
+        gpsBtn.classList.add('active');
+        gpsBtn.textContent = "GPS ACTIVE";
+        lastGpsDataTime = Date.now(); 
+        const speedKmh = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0; 
+        document.getElementById('speed_val').textContent = speedKmh; 
+        const currentPos = { lat: pos.coords.latitude, lon: pos.coords.longitude, time: Date.now() }; 
+        if (swState === 1 && LAP_LINE_P1.lat !== 0) { 
+            const currentSide = getSideOfLine(currentPos.lat, currentPos.lon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon); 
+            if (lastPos && previousSideOfLine !== null) { 
+                if (((previousSideOfLine > 0 && currentSide < 0) || (previousSideOfLine < 0 && currentSide > 0)) && (currentPos.time - lastLapTime >= lapCoolDown)) { 
+                    const foot = calculatePerpendicularFootApprox(LAP_LINE_P1, LAP_LINE_P2, currentPos); 
+                    if (calculateDistance(currentPos.lat, currentPos.lon, foot.lat, foot.lon) <= gpsThresholdValue) { 
+                        const exactTime = getIntersectionTime(lastPos, currentPos); if (exactTime) processLap(exactTime, true); 
+                    } 
+                } 
+            } 
+            previousSideOfLine = currentSide; 
+        } 
+        lastPos = currentPos; 
+    }, err => { gpsBtn.classList.remove('searching', 'active'); gpsBtn.textContent = "GPS ERR"; }, options); 
+}
 
-    <div class="control-group">
-        <label>計測閾値(m):</label>
-        <select id="thresholdSelect">
-            <script>for(let i=5; i<=50; i+=5) document.write(`<option value="${i}" ${i==20?'selected':''}>${i}m</option>`);</script>
-        </select>
-        <button id="saveThresholdButton">閾値を保存</button>
-        <div id="setThreshold" class="result-text">設定なし</div>
-        
-        <label style="margin-top:10px;">クールダウン(秒):</label>
-        <select id="lapCoolDownSelect">
-            <option value="10000">10秒</option><option value="20000">20秒</option>
-            <option value="30000" selected>30秒</option><option value="60000">60秒</option>
-        </select>
-        <button id="saveLapCoolDownButton">クールダウンを保存</button>
-        <div id="setLapCoolDown" class="result-text">設定なし</div>
-    </div>
+async function ble() { const btn = document.getElementById('btConnect'); btn.classList.add('searching'); try { const bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] }); const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID); btn.classList.remove('searching'); btn.classList.add('active'); btn.textContent = "BLE CONNECTED"; const pC = await service.getCharacteristic(PULSE_UUID), tC = await service.getCharacteristic(TEMP_UUID); await pC.startNotifications(); pC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount; }; await tC.startNotifications(); tC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); document.getElementById('temp_val').textContent = e.target.value.getUint8(0); }; } catch (e) { btn.classList.remove('searching', 'active'); } }
 
-    <div class="control-group" style="background: #fff0f0;">
-        <button id="resetStorageButton" style="background: #d9534f;">全設定をリセット</button>
-    </div>
+function processLap(exactTime, useFreeze) { const lapTime = exactTime - (lapStartTime || startTime); lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime; const d = document.getElementById('lap'); d.innerHTML = ""; const best = Math.min(...lapRecords); lapRecords.forEach((t, i) => { const r = document.createElement('div'); r.className = `lap-row ${t === best ? 'best-lap' : ''}`; r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; d.appendChild(r); }); if (useFreeze) { isFrozen = true; freezeDisplayTime = timeFormat(lapTime); freezeStartTime = Date.now(); } }
+function timeFormat(ms) { let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), mss = Math.floor(ms%1000); return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${mss.toString().padStart(3,'0')}`; }
+function tick() { if (swState !== 1) return; const now = Date.now(); document.getElementById('display').textContent = "TOTAL " + timeFormat(now - startTime); const lapDisp = document.getElementById('display1'); if (isFrozen) { lapDisp.textContent = freezeDisplayTime; if (now - freezeStartTime > 15000) isFrozen = false; } else { lapDisp.textContent = timeFormat(now - lapStartTime); } requestAnimationFrame(tick); }
 
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="circuit_data.js"></script>
+function drawTacho(rpm) { ctx.clearRect(0, 0, canvas.width, canvas.height); const w = canvas.width, h = canvas.height, segments = 75, active = Math.floor((rpm / 14000) * segments); const sX = 20, hY = 80, bY = h - 20, rad = bY - hY, curveEnd = 30; for (let i = 0; i <= segments; i++) { let x, y, ang, prog; if (i <= curveEnd) { prog = i / curveEnd; ang = Math.PI + (prog * (Math.PI / 2)); x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad; } else { prog = (i - curveEnd) / (segments - curveEnd); x = (sX + rad) + (prog * (w - 15 - (sX + rad))); y = hY; ang = 1.5 * Math.PI; } if (i % 10 === 0 || i === segments) { ctx.save(); ctx.fillStyle = i < active ? "#fff" : "#444"; ctx.font = "italic bold 22px Arial"; ctx.textAlign = "center"; ctx.fillText(Math.round((i / segments) * 14), x + Math.cos(ang) * 45, y + Math.sin(ang) * 45); ctx.restore(); } if (i < segments) { ctx.fillStyle = i < active ? (((i/segments)*14000) >= 12500 ? "#E4002B" : (((i/segments)*14000) >= 8000 ? "#004098" : "#FFFFFF")) : "#222"; ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.fillRect(-5, -23, 10, 46); ctx.restore(); } } document.getElementById('rpm_val').textContent = Math.floor(rpm); }
 
-    <script>
-        let map, startMarker, endMarker, line, currentCircle;
-        let p1Temp = null, p2Temp = null;
+function updateSettings() { 
+    const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon'), p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon'), pl1 = localStorage.getItem('pl1'), gThr = localStorage.getItem('gpsThreshold'), lCD = localStorage.getItem('lapCoolDownTime');
+    const btn = document.getElementById('reloadBtn'); 
+    const isAllSet = p1Lat && p1Lon && p2Lat && p2Lon && pl1 && gThr && lCD;
+    if (!isAllSet) { btn.classList.remove('active'); btn.style.backgroundColor = "var(--hrc-orange)"; btn.style.color = "#000"; return false; } 
+    else { btn.classList.add('active'); btn.style.backgroundColor = ""; btn.style.color = ""; LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) }; LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) }; pulseCount = parseInt(pl1) || 1; gpsThresholdValue = parseFloat(gThr) || 20; lapCoolDown = parseFloat(lCD) || 15000; return true; } 
+}
 
-        function initMap() {
-            map = L.map('mapid').setView([35.68, 139.76], 15);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+function toggleDemoMode() { if (isDemoMode) { clearInterval(demoInterval); isDemoMode = false; currentRPM = 0; } else { isDemoMode = true; if (swState !== 1) document.getElementById('startBtn').click(); demoInterval = setInterval(() => { currentRPM = Math.floor(Math.random() * 4000) + 8000; document.getElementById('speed_val').textContent = Math.floor(Math.random() * 40) + 120; if (Date.now() - lastLapTime > 25000) processLap(Date.now(), true); }, 100); } }
 
-            navigator.geolocation.watchPosition(pos => {
-                const latlng = [pos.coords.latitude, pos.coords.longitude];
-                if (!currentCircle) {
-                    currentCircle = L.circle(latlng, { radius: 5, color: 'blue', fillOpacity: 0.6 }).addTo(map);
-                    map.setView(latlng, 17);
-                } else {
-                    currentCircle.setLatLng(latlng);
-                }
-                document.getElementById('instructionMessage').textContent = "P1/P2ボタンでマーカーを設置し、ドラッグして保存してください。";
-            }, null, { enableHighAccuracy: true });
-        }
+document.getElementById('intGpsBtn').onclick = startInternalGps;
+document.getElementById('btConnect').onclick = ble;
+document.getElementById('startBtn').onclick = () => { if(swState !== 1) { swState = 1; startTime = Date.now(); lapStartTime = startTime; tick(); document.getElementById('startBtn').classList.add('active'); } else { swState = 2; document.getElementById('startBtn').classList.remove('active'); } };
+document.getElementById('lapBtn').onclick = () => { if(swState === 1) processLap(Date.now(), false); else { swState = 0; lapRecords = []; document.getElementById('lap').innerHTML = ""; document.getElementById('display1').textContent = "00:00.000"; } };
+document.getElementById('reloadBtn').onclick = () => { demoClickCount++; setTimeout(() => { demoClickCount = 0; }, 2000); if (demoClickCount >= 5) toggleDemoMode(); else updateSettings(); };
 
-        function placeMarker(type) {
-            const center = map.getCenter();
-            if (type === 'p1') {
-                if (startMarker) map.removeLayer(startMarker);
-                startMarker = L.marker(center, { draggable: true, title: "P1" }).addTo(map);
-                p1Temp = center;
-                startMarker.on('dragend', e => { p1Temp = e.target.getLatLng(); updatePreviewLine(); });
-            } else {
-                if (endMarker) map.removeLayer(endMarker);
-                endMarker = L.marker(center, { draggable: true, title: "P2" }).addTo(map);
-                p2Temp = center;
-                endMarker.on('dragend', e => { p2Temp = e.target.getLatLng(); updatePreviewLine(); });
-            }
-            updatePreviewLine();
-        }
-
-        function updatePreviewLine() {
-            if (line) map.removeLayer(line);
-            if (p1Temp && p2Temp) {
-                line = L.polyline([p1Temp, p2Temp], { color: 'red', weight: 3, dashArray: '5, 5' }).addTo(map);
-            }
-        }
-
-        document.getElementById('btnDecide').onclick = () => {
-            if (!p1Temp || !p2Temp) { alert("P1とP2の両方を設置してください。"); return; }
-            localStorage.setItem('startLineP1Lat', p1Temp.lat);
-            localStorage.setItem('startLineP1Lon', p1Temp.lng);
-            localStorage.setItem('startLineP2Lat', p2Temp.lat);
-            localStorage.setItem('startLineP2Lon', p2Temp.lng);
-            if (line) line.setStyle({ dashArray: null, color: 'red' });
-            alert("保存しました。");
-            displayStatus();
-        };
-
-        function displayStatus() {
-            const p1 = localStorage.getItem('startLineP1Lat') ? "P1:OK" : "P1:--";
-            const p2 = localStorage.getItem('startLineP2Lat') ? "P2:OK" : "P2:--";
-            document.getElementById('clickCoordinates').textContent = `保存済み: ${p1} / ${p2}`;
-        }
-
-        function loadCircuitList() {
-            if (typeof circuitData !== 'undefined') {
-                const sel = document.getElementById('circuitSelect');
-                Object.keys(circuitData).forEach(key => {
-                    let o = document.createElement('option');
-                    o.value = key; o.textContent = circuitData[key].name; sel.appendChild(o);
-                });
-            }
-        }
-
-        document.getElementById('saveCircuitButton').onclick = () => {
-            const id = document.getElementById('circuitSelect').value;
-            if (id !== "" && circuitData[id]) {
-                const data = circuitData[id];
-                p1Temp = { lat: data.startLineP1[1], lng: data.startLineP1[0] };
-                p2Temp = { lat: data.startLineP2[1], lng: data.startLineP2[0] };
-                if (startMarker) map.removeLayer(startMarker);
-                if (endMarker) map.removeLayer(endMarker);
-                startMarker = L.marker(p1Temp, { draggable: true }).addTo(map);
-                endMarker = L.marker(p2Temp, { draggable: true }).addTo(map);
-                map.setView(p1Temp, 17);
-                updatePreviewLine();
-                document.getElementById('selectedCircuitDisplay').textContent = data.name + " 適用中";
-            }
-        };
-
-        document.getElementById('savePulseButton').onclick = () => {
-            const v = document.getElementById('pulseSelect').value;
-            localStorage.setItem('pl1', v);
-            document.getElementById('setPulse').textContent = v + " パルス/回転";
-            alert("パルス数を保存しました");
-        };
-
-        document.getElementById('saveThresholdButton').onclick = () => {
-            const v = document.getElementById('thresholdSelect').value;
-            localStorage.setItem('gpsThreshold', v);
-            document.getElementById('setThreshold').textContent = v + "m";
-            alert("閾値を保存しました");
-        };
-
-        document.getElementById('saveLapCoolDownButton').onclick = () => {
-            const v = document.getElementById('lapCoolDownSelect').value;
-            localStorage.setItem('lapCoolDownTime', v);
-            document.getElementById('setLapCoolDown').textContent = (v/1000) + "秒";
-            alert("クールダウンを保存しました");
-        };
-
-        document.getElementById('btnP1').onclick = () => placeMarker('p1');
-        document.getElementById('btnP2').onclick = () => placeMarker('p2');
-        document.getElementById('resetStorageButton').onclick = () => { if(confirm("全消去しますか？")) { localStorage.clear(); location.reload(); } };
-
-        window.onload = () => {
-            initMap();
-            loadCircuitList();
-            displayStatus();
-            document.getElementById('setPulse').textContent = (localStorage.getItem('pl1') || "1") + " パルス/回転";
-            document.getElementById('setThreshold').textContent = (localStorage.getItem('gpsThreshold') || "20") + "m";
-            document.getElementById('setLapCoolDown').textContent = ((localStorage.getItem('lapCoolDownTime') || "30000")/1000) + "秒";
-        };
-    </script>
+setInterval(() => { const now = Date.now(); if (now - lastBleDataTime > 3000 && lastBleDataTime !== 0) { document.getElementById('btConnect').classList.remove('active'); } }, 1000);
+window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight - 60; };
+window.onload = () => { window.dispatchEvent(new Event('resize')); updateSettings(); (function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop); })(); };
+</script>
 </body>
-
 </html>
