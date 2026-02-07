@@ -134,38 +134,56 @@ async function ble() {
         // 3. サービスの取得
         const service = await server.getPrimaryService(SERVICE_UUID);
 
-        // --- ここからiPad/Bluefy対策の逐次処理 ---
+        // --- iPad (Bluefy) 安定化のための逐次処理 ---
         
-        // 4. RPM（パルス）特性の取得と通知開始
+        // 4. RPM（パルス）特性の取得
         const pC = await service.getCharacteristic(PULSE_UUID);
-        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms待機
+        // iOS/iPadOS対策：リクエストが拒否されないよう意図的に待機を入れる
+        await new Promise(resolve => setTimeout(resolve, 600)); 
+        
         await pC.startNotifications();
         pC.oncharacteristicvaluechanged = (e) => {
             lastBleDataTime = Date.now();
-            currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount;
+            const data = e.target.value;
+            let rawValue = 0;
+
+            // データ長に応じた解析（Android/iPad両対応）
+            if (data.byteLength >= 2) {
+                rawValue = data.getUint16(0, true); // 2バイト・リトルエンディアン
+            } else if (data.byteLength === 1) {
+                rawValue = data.getUint8(0); // 1バイト
+            }
+
+            // 計算と画面表示
+            const pCount = (pulseCount && pulseCount > 0) ? pulseCount : 1;
+            currentRPM = (rawValue * 60) / pCount;
+            document.getElementById('rpm_val').textContent = Math.floor(currentRPM);
         };
 
-        // 5. 温度特性の取得と通知開始（さらに待機を入れる）
-        await new Promise(resolve => setTimeout(resolve, 800)); // 800ms待機
+        // 5. 温度（TEMP）特性の取得
+        await new Promise(resolve => setTimeout(resolve, 800)); // 連続リクエストを避けるための待機
         const tC = await service.getCharacteristic(TEMP_UUID);
-        await new Promise(resolve => setTimeout(resolve, 500)); 
+        
+        await new Promise(resolve => setTimeout(resolve, 600)); 
         await tC.startNotifications();
         tC.oncharacteristicvaluechanged = (e) => {
             lastBleDataTime = Date.now();
-            document.getElementById('temp_val').textContent = e.target.value.getUint8(0);
+            const temp = e.target.value.getUint8(0);
+            document.getElementById('temp_val').textContent = temp;
         };
 
-        // 完了
+        // 接続成功時のUI更新
         btn.classList.remove('searching');
         btn.classList.add('active');
         btn.textContent = "BLE CONNECTED";
 
     } catch (e) {
-        console.error(e);
+        console.error("BLE Error:", e);
         btn.classList.remove('searching', 'active');
         btn.textContent = "BLE ERR";
-        // エラー内容を画面にアラートで出す（デバッグ用）
-        // alert("Connection Error: " + e.message); 
+        
+        // iPadでエラーの詳細を確認したい場合は、以下のアラートを有効にしてください
+        // alert("Error: " + e.message);
     }
 }
 function processLap(exactTime, useFreeze) { const lapTime = exactTime - (lapStartTime || startTime); lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime; const d = document.getElementById('lap'); d.innerHTML = ""; const best = Math.min(...lapRecords); lapRecords.forEach((t, i) => { const r = document.createElement('div'); r.className = `lap-row ${t === best ? 'best-lap' : ''}`; r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; d.appendChild(r); }); if (useFreeze) { isFrozen = true; freezeDisplayTime = timeFormat(lapTime); freezeStartTime = Date.now(); } }
@@ -196,4 +214,5 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
 
